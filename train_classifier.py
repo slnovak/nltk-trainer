@@ -28,7 +28,7 @@ parser.add_argument('--filename', help='''filename/path for where to store the
 	~/nltk_data/classifiers''')
 parser.add_argument('--no-pickle', action='store_true', default=False,
 	help="don't pickle and save the classifier")
-parser.add_argument('--classifier', '--algorithm', default=['NaiveBayes'], nargs='+',
+parser.add_argument('--classifier', '--algorithm', default=['NaiveBayes'], nargs=1,
 	choices=nltk_trainer.classification.args.classifier_choices,
 	help='''Classifier algorithm to use, defaults to %(default)s. Maxent uses the
 	default Maxent training algorithm, either CG or iis.''')
@@ -364,6 +364,18 @@ if not args.no_pickle and not args.cross_fold:
 		fname = os.path.expanduser(args.filename)
 	else:
 		name = '%s_%s.pickle' % (args.corpus, '_'.join(args.classifier))
-		fname = os.path.join(os.path.expanduser('~/nltk_data/classifiers'), name)
+		fname = os.path.join(os.path.expanduser('~/nltk_data/classifiers'), name.lower())
 	
+	# We can't persist the SVM classifier directly since it contains
+	# C-objects. We need to save the model separately.
+	if classifier.__class__.__name__ == "SvmClassifier":
+		import svmlight
+		
+		model_name = '%s_%s_model.dat' % (args.corpus, '_'.join(args.classifier))
+		model_fname = os.path.join(os.path.expanduser('~/nltk_data/classifiers'), model_name.lower())
+		svmlight.write_model(classifier._model, model_fname)
+		
+		# Remove the model from the classifier so it can be saved.
+		classifier._model = None
+		
 	dump_object(classifier, fname, trace=args.trace)
